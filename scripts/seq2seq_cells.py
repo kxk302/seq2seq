@@ -45,6 +45,8 @@ models are more common in this domain.
 """
 ## Setup
 """
+import random
+import sys
 
 import numpy as np
 import tensorflow as tf
@@ -69,6 +71,11 @@ latent_dim = 256  # Latent dimensionality of the encoding space.
 num_samples = 10000  # Number of samples to train on.
 # Path to the data txt file on disk.
 data_path = "./data/fra.txt"
+
+predict = False
+if len(sys.argv) > 0:
+    if(sys.argv[1]) == "predict":
+        predict = True
 
 """
 ## Prepare the data
@@ -155,24 +162,28 @@ decoder_outputs2, _, _ = decoder_lstm2(decoder_inputs, initial_state=[encoder2_h
 
 decoder_dense = keras.layers.Dense(num_decoder_tokens, activation="softmax", name="decoder_dense")
 decoder_outputs = decoder_dense(tf.keras.layers.concatenate([decoder_outputs1 , decoder_outputs2]))
-model = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
 
-"""
-## Train the model
-"""
+if predict == False:
 
-model.compile(
-    optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
-)
-model.fit(
-    [encoder_input_data, decoder_input_data],
-    decoder_target_data,
-    batch_size=batch_size,
-    epochs=epochs,
-    validation_split=0.2,
-)
-# Save model
-model.save("s2s-cells")
+    model = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
+    print(model.summary())
+
+    """
+    ## Train the model
+    """
+
+    model.compile(
+        optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
+    )
+    model.fit(
+        [encoder_input_data, decoder_input_data],
+        decoder_target_data,
+        batch_size=batch_size,
+        epochs=epochs,
+        validation_split=0.2,
+    )
+    # Save model
+    model.save("s2s-cells")
 
 """
 ## Run inference (sampling)
@@ -191,7 +202,7 @@ model = keras.models.load_model("s2s-cells")
 encoder_inputs = model.input[0]  # input_1
 encoder_outputs_1, state_h_enc_1, state_c_enc_1 = model.layers[2].output  # lstm_1
 encoder_outputs_2, state_h_enc_2, state_c_enc_2 = model.layers[3].output  # lstm_2
-encoder_states = [state_h_enc_1, state_h_enc_2, state_c_enc_1, state_c_enc_2]
+encoder_states = [state_h_enc_1, state_c_enc_1, state_h_enc_2, state_c_enc_2]
 encoder_model = keras.Model(encoder_inputs, encoder_states)
 
 decoder_inputs = model.input[1]  # input_2
@@ -209,7 +220,7 @@ decoder_lstm_2 = model.layers[5]
 decoder_outputs_2, state_h_dec_2, state_c_dec_2 = decoder_lstm_2(
     decoder_inputs, initial_state=decoder_states_inputs_2
 )
-decoder_states = [state_h_dec_1, state_h_dec_2, state_c_dec_1, state_c_dec_2]
+decoder_states = [state_h_dec_1, state_c_dec_1, state_h_dec_2, state_c_dec_2]
 decoder_dense = model.layers[7]
 decoder_outputs = decoder_dense(tf.keras.layers.concatenate([decoder_outputs_1, decoder_outputs_2]))
 decoder_model = keras.Model(
@@ -236,7 +247,7 @@ def decode_sequence(input_seq):
     stop_condition = False
     decoded_sentence = ""
     while not stop_condition:
-        output_tokens, h1, h2, c1, c2 = decoder_model.predict([target_seq] + states_value)
+        output_tokens, h1, c1, h2, c2 = decoder_model.predict([target_seq] + states_value)
 
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
@@ -253,17 +264,18 @@ def decode_sequence(input_seq):
         target_seq[0, 0, sampled_token_index] = 1.0
 
         # Update states
-        states_value = [h1, h2, c1, c2]
+        states_value = [h1, c1, h2, c2]
     return decoded_sentence
 
 
 """
 You can now generate decoded sentences as such:
 """
-
-for seq_index in range(1):
+random.seed(1234)
+for idx in range(5):
     # Take one sequence (part of the training set)
     # for trying out decoding.
+    seq_index = random.randrange(len(input_texts))
     input_seq = encoder_input_data[seq_index : seq_index + 1]
     decoded_sentence = decode_sequence(input_seq)
     print("-")

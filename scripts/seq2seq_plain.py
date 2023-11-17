@@ -45,6 +45,8 @@ models are more common in this domain.
 """
 ## Setup
 """
+import random
+import sys
 
 import numpy as np
 import tensorflow as tf
@@ -69,6 +71,11 @@ latent_dim = 256  # Latent dimensionality of the encoding space.
 num_samples = 10000  # Number of samples to train on.
 # Path to the data txt file on disk.
 data_path = "./data/fra.txt"
+
+predict = False
+if len(sys.argv) > 0:
+    if(sys.argv[1]) == "predict":
+        predict = True
 
 """
 ## Prepare the data
@@ -158,26 +165,29 @@ decoder_outputs, _, _ = decoder_lstm(decoder_inputs, initial_state=encoder_state
 decoder_dense = keras.layers.Dense(num_decoder_tokens, activation="softmax")
 decoder_outputs = decoder_dense(decoder_outputs)
 
-# Define the model that will turn
-# `encoder_input_data` & `decoder_input_data` into `decoder_target_data`
-model = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
+if predict == False:
 
-"""
-## Train the model
-"""
+    # Define the model that will turn
+    # `encoder_input_data` & `decoder_input_data` into `decoder_target_data`
+    model = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
+    print(model.summary())
 
-model.compile(
-    optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
-)
-model.fit(
-    [encoder_input_data, decoder_input_data],
-    decoder_target_data,
-    batch_size=batch_size,
-    epochs=epochs,
-    validation_split=0.2,
-)
-# Save model
-model.save("s2s")
+    """
+    ## Train the model
+    """
+
+    model.compile(
+        optimizer="rmsprop", loss="categorical_crossentropy", metrics=["accuracy"]
+    )
+    model.fit(
+        [encoder_input_data, decoder_input_data],
+        decoder_target_data,
+        batch_size=batch_size,
+        epochs=epochs,
+        validation_split=0.2,
+    )
+    # Save model
+    model.save("s2s")
 
 """
 ## Run inference (sampling)
@@ -257,10 +267,11 @@ def decode_sequence(input_seq):
 """
 You can now generate decoded sentences as such:
 """
-
-for seq_index in range(2):
+random.seed(1234)
+for idx in range(5):
     # Take one sequence (part of the training set)
     # for trying out decoding.
+    seq_index = random.randrange(len(input_texts))
     input_seq = encoder_input_data[seq_index : seq_index + 1]
     decoded_sentence = decode_sequence(input_seq)
     print("-")
