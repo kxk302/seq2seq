@@ -7,7 +7,8 @@ Added two seq2seq models: One has 2 LSTM cells. The other has 2 LSTM layers with
 
 To run the scripts, create and activate a virtual environment by running the following command:
 
-> python3 -m venv venv;
+> python3 -m venv venv;\
+> . ./venv/bin/actgivate;\
 > pip install -r requirements.txt;
 
 # Training the models
