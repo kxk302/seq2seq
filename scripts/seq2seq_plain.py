@@ -73,7 +73,7 @@ num_samples = 10000  # Number of samples to train on.
 data_path = "./data/fra.txt"
 
 predict = False
-if len(sys.argv) > 0:
+if len(sys.argv) == 2:
     if(sys.argv[1]) == "predict":
         predict = True
 
@@ -187,7 +187,7 @@ if predict == False:
         validation_split=0.2,
     )
     # Save model
-    model.save("s2s")
+    model.save("s2s_plain")
 
 """
 ## Run inference (sampling)
@@ -201,7 +201,10 @@ Output will be the next target token.
 
 # Define sampling models
 # Restore the model and construct the encoder and decoder.
-model = keras.models.load_model("s2s")
+model = keras.models.load_model("s2s_plain")
+
+# Save the model graph to png file
+tf.keras.utils.plot_model(model, to_file='plain.png', show_shapes=True, show_dtype=True)
 
 encoder_inputs = model.input[0]  # input_1
 encoder_outputs, state_h_enc, state_c_enc = model.layers[2].output  # lstm_1
