@@ -204,7 +204,7 @@ Output will be the next target token.
 model = keras.models.load_model("s2s_plain")
 
 # Save the model graph to png file
-tf.keras.utils.plot_model(model, to_file='plain.png', show_shapes=True, show_dtype=True)
+tf.keras.utils.plot_model(model, to_file='./plots/plain.png', show_shapes=True, show_dtype=True)
 
 encoder_inputs = model.input[0]  # input_1
 encoder_outputs, state_h_enc, state_c_enc = model.layers[2].output  # lstm_1

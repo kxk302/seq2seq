@@ -212,7 +212,7 @@ Output will be the next target token.
 model = keras.models.load_model("s2s_plain_with_attention")
 
 # Save the model graph to png file
-tf.keras.utils.plot_model(model, to_file='plain_with_attention.png', show_shapes=True, show_dtype=True)
+tf.keras.utils.plot_model(model, to_file='./plots/plain_with_attention.png', show_shapes=True, show_dtype=True)
 
 r_encoder_inputs = model.input[0]  # input_1
 r_encoder_outputs, r_state_h_enc, r_state_c_enc = model.layers[2].output  # lstm_1
