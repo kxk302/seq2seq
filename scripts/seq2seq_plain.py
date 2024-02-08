@@ -187,7 +187,7 @@ if predict == False:
         validation_split=0.2,
     )
     # Save model
-    model.save("s2s_plain")
+    model.save("s2s_plain.keras")
 
 """
 ## Run inference (sampling)
@@ -201,7 +201,7 @@ Output will be the next target token.
 
 # Define sampling models
 # Restore the model and construct the encoder and decoder.
-model = keras.models.load_model("s2s_plain")
+model = keras.models.load_model("s2s_plain.keras")
 
 # Save the model graph to png file
 tf.keras.utils.plot_model(model, to_file='./plots/plain.png', show_shapes=True, show_dtype=True)

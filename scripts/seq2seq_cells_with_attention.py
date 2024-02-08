@@ -66,7 +66,7 @@ from tensorflow import keras
 """
 
 batch_size = 64  # Batch size for training.
-epochs = 100  # Number of epochs to train for.
+epochs = 1  # Number of epochs to train for.
 latent_dim = 256  # Latent dimensionality of the encoding space.
 num_samples = 10000  # Number of samples to train on.
 # Path to the data txt file on disk.
@@ -145,44 +145,41 @@ for i, (input_text, target_text) in enumerate(zip(input_texts, target_texts)):
 """
 ## Build the model
 """
-enc_in_1 = keras.Input(shape=(None, num_encoder_tokens), name="encoder_inputs")
 
-# Encoder layer 1
-enc1_1 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="enc1_1")
-enc1_2 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="enc1_2")
+encoder_inputs = keras.Input(shape=(None, num_encoder_tokens), name="encoder_inputs")
+encoder_1 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="encoder1")
+encoder_2 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="encoder2")
 
-enc1_1_out, enc1_1_h_state, enc1_1_c_state = enc1_1(enc_in_1)
-enc1_2_out, enc1_2_h_state, enc1_2_c_state = enc1_2(enc_in_1)
+encoder_outputs_1, encoder_h_state_1, encoder_c_state_1 = encoder_1(encoder_inputs)
+encoder_outputs_2, encoder_h_state_2, encoder_c_state_2 = encoder_2(encoder_inputs)
 
-# Encoder layer 2
-enc2_1 = keras.layers.LSTM(latent_dim, return_state=True, name="enc2_1")
-enc2_2 = keras.layers.LSTM(latent_dim, return_state=True, name="enc2_2")
+decoder_inputs = keras.Input(shape=(None, num_decoder_tokens), name="decoder_inputs")
+decoder_lstm_1 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="decoder_lstm1")
+decoder_lstm_2 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="decoder_lstm2")
 
-enc2_1_out, enc2_1_h_state, enc2_1_c_state = enc2_1(enc1_1_out)
-enc2_2_out, enc2_2_h_state, enc2_2_c_state = enc2_2(enc1_2_out)
+decoder_outputs_1, _, _ = decoder_lstm_1(decoder_inputs, initial_state=[encoder_h_state_1, encoder_c_state_1])
+decoder_outputs_2, _, _ = decoder_lstm_2(decoder_inputs, initial_state=[encoder_h_state_2, encoder_c_state_2])
 
-# Decoder inputs
-dec_in_1 = keras.Input(shape=(None, num_decoder_tokens), name="dec_in_1")
+# Adding attention to the model
+attention_1 = keras.layers.Attention(name="attention_1")
+attention_2 = keras.layers.Attention(name="attention_2")
+attention_outputs_1 = attention_1([decoder_outputs_1, encoder_outputs_1])
+attention_outputs_2 = attention_2([decoder_outputs_2, encoder_outputs_2])
 
-# Decoder layer 1
-dec1_1 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="dec1_1")
-dec1_2 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="dec1_2")
+concatenate_1 = keras.layers.Concatenate(axis=-1, name="concatenate_1")
+concatenate_2 = keras.layers.Concatenate(axis=-1, name="concatenate_2")
+decoder_concat_outputs_1 = concatenate_1([decoder_outputs_1, attention_outputs_1])
+decoder_concat_outputs_2 = concatenate_2([decoder_outputs_2, attention_outputs_2])
 
-dec_out1_1, dec1_1_h_state, dec1_1_c_state = dec1_1(dec_in_1, initial_state=[enc1_1_h_state, enc1_1_c_state])
-dec_out1_2, dec1_2_h_state, dec1_2_c_state = dec1_2(dec_in_1, initial_state=[enc1_2_h_state, enc1_2_c_state])
+concatenate = keras.layers.Concatenate(axis=-1, name="concatenate")
+concatenate_output = concatenate([decoder_concat_outputs_1 , decoder_concat_outputs_2])
 
-# Decoder layer 2
-dec2_1 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="dec2_1")
-dec2_2 = keras.layers.LSTM(latent_dim, return_sequences=True, return_state=True, name="dec2_2")
-
-dec_out2_1, dec2_1_h_state, dec2_1_c_state = dec2_1(dec_out1_1, initial_state=[enc2_1_h_state, enc2_1_c_state])
-dec_out2_2, dec2_2_h_state, dec2_2_c_state = dec2_2(dec_out1_2, initial_state=[enc2_2_h_state, enc2_2_c_state])
-
-dec_dense = keras.layers.Dense(num_decoder_tokens, activation="softmax", name="dec_dense")
-dec_out = dec_dense(tf.keras.layers.concatenate([dec_out2_1 , dec_out2_2]))
+decoder_dense = keras.layers.Dense(num_decoder_tokens, activation="softmax", name="decoder_dense")
+decoder_outputs = decoder_dense(concatenate_output)
 
 if predict == False:
-    model = keras.Model(inputs=[enc_in_1, dec_in_1], outputs=dec_out)
+
+    model = keras.Model([encoder_inputs, decoder_inputs], decoder_outputs)
     print(model.summary())
 
     """
@@ -200,7 +197,7 @@ if predict == False:
         validation_split=0.2,
     )
     # Save model
-    model.save("s2s_layers.keras")
+    model.save("s2s_cells_with_attention.keras")
 
 """
 ## Run inference (sampling)
@@ -214,59 +211,50 @@ Output will be the next target token.
 
 # Define sampling models
 # Restore the model and construct the encoder and decoder.
-model = keras.models.load_model("s2s_layers.keras")
+model = keras.models.load_model("s2s_cells_with_attention.keras")
 
 encoder_inputs = model.input[0]  # input_1
-enc1_1_out, enc1_1_state_h, enc1_1_state_c = model.layers[2].output # enc1_1
-enc1_2_out, enc1_2_state_h, enc1_2_state_c = model.layers[3].output # enc1_2
-
-enc2_1_out, enc2_1_state_h, enc2_1_state_c = model.layers[5].output # enc_2_1
-enc2_2_out, enc2_2_state_h, enc2_2_state_c = model.layers[7].output # enc_2_2  
-
-encoder_outputs = [enc1_1_state_h, enc1_1_state_c, enc1_2_state_h, enc1_2_state_c, enc2_1_state_h, enc2_1_state_c, enc2_2_state_h, enc2_2_state_c]
-
-encoder_model = keras.Model(encoder_inputs, encoder_outputs)
+encoder_outputs_1, state_h_enc_1, state_c_enc_1 = model.layers[2].output  # lstm_1
+encoder_outputs_2, state_h_enc_2, state_c_enc_2 = model.layers[3].output  # lstm_2
+encoder_states = [state_h_enc_1, state_c_enc_1, state_h_enc_2, state_c_enc_2]
+encoder_model = keras.Model(encoder_inputs, [encoder_outputs_1, encoder_outputs_2, state_h_enc_1, state_c_enc_1, state_h_enc_2, state_c_enc_2])
 
 decoder_inputs = model.input[1]  # input_2
-
 decoder_state_input_h_1 = keras.Input(shape=(latent_dim,))
 decoder_state_input_c_1 = keras.Input(shape=(latent_dim,))
 decoder_states_inputs_1 = [decoder_state_input_h_1, decoder_state_input_c_1]
 decoder_state_input_h_2 = keras.Input(shape=(latent_dim,))
 decoder_state_input_c_2 = keras.Input(shape=(latent_dim,))
 decoder_states_inputs_2 = [decoder_state_input_h_2, decoder_state_input_c_2]
-decoder_state_input_h_3 = keras.Input(shape=(latent_dim,))
-decoder_state_input_c_3 = keras.Input(shape=(latent_dim,))
-decoder_states_inputs_3 = [decoder_state_input_h_3, decoder_state_input_c_3]
-decoder_state_input_h_4 = keras.Input(shape=(latent_dim,))
-decoder_state_input_c_4 = keras.Input(shape=(latent_dim,))
-decoder_states_inputs_4 = [decoder_state_input_h_4, decoder_state_input_c_4]
-
-dec1_1 = model.layers[4] # dec1_1
-dec1_2 = model.layers[6] # dec1_2
-
-dec1_1_out, dec1_1_state_h, dec1_1_state_c = dec1_1(
+decoder_lstm_1 = model.layers[4]
+decoder_outputs_1, state_h_dec_1, state_c_dec_1 = decoder_lstm_1(
     decoder_inputs, initial_state=decoder_states_inputs_1
 )
-dec1_2_out, dec1_2_state_h, dec1_2_state_c = dec1_2(
+decoder_lstm_2 = model.layers[5]
+decoder_outputs_2, state_h_dec_2, state_c_dec_2 = decoder_lstm_2(
     decoder_inputs, initial_state=decoder_states_inputs_2
 )
+decoder_states = [state_h_dec_1, state_c_dec_1, state_h_dec_2, state_c_dec_2]
 
-dec2_1 = model.layers[8] # dec2_1
-dec2_2 = model.layers[9] # dec2_2
+encoder_outputs_input_1 = keras.Input(shape=(None, latent_dim))
+encoder_outputs_input_2 = keras.Input(shape=(None, latent_dim))
+r_attention_layer_1 = model.layers[6]
+r_attention_layer_2 = model.layers[7]
+r_attention_output_1 = r_attention_layer_1([decoder_outputs_1, encoder_outputs_input_1])
+r_attention_output_2 = r_attention_layer_2([decoder_outputs_2, encoder_outputs_input_2])
 
-dec2_1_out, dec2_1_state_h, dec2_1_state_c = dec2_1(
-    dec1_1_out, initial_state=decoder_states_inputs_3
-)
-dec2_2_out, dec2_2_state_h, dec2_2_state_c = dec2_2(
-    dec1_2_out, initial_state=decoder_states_inputs_4
-)
+r_concatenate_layer_1 = model.layers[8]
+r_concatenate_layer_2 = model.layers[9]
+r_concatenate_output_1 = r_concatenate_layer_1([decoder_outputs_1, r_attention_output_1])
+r_concatenate_output_2 = r_concatenate_layer_2([decoder_outputs_2, r_attention_output_2])
 
-decoder_states = [dec1_1_state_h, dec1_1_state_c, dec1_2_state_h, dec1_2_state_c, dec2_1_state_h, dec2_1_state_c, dec2_2_state_h, dec2_2_state_c]
-decoder_dense = model.layers[11] # dense
-decoder_outputs = decoder_dense(tf.keras.layers.concatenate([dec2_1_out, dec2_2_out]))
+r_concatenate_layer = model.layers[10]
+r_concatenate_output = r_concatenate_layer([r_concatenate_output_1, r_concatenate_output_2])
+
+decoder_dense = model.layers[11]
+decoder_outputs = decoder_dense(r_concatenate_output)
 decoder_model = keras.Model(
-    [decoder_inputs] + decoder_states_inputs_1 + decoder_states_inputs_2 + decoder_states_inputs_3 + decoder_states_inputs_4, [decoder_outputs] + decoder_states
+    [decoder_inputs, decoder_state_input_h_1, decoder_state_input_c_1, decoder_state_input_h_2, decoder_state_input_c_2, encoder_outputs_input_1, encoder_outputs_input_2], [decoder_outputs] + decoder_states
 )
 
 # Reverse-lookup token index to decode sequences back to
@@ -277,7 +265,8 @@ reverse_target_char_index = dict((i, char) for char, i in target_token_index.ite
 
 def decode_sequence(input_seq):
     # Encode the input as state vectors.
-    states_value = encoder_model.predict(input_seq)
+    encoder_outputs_1, encoder_outputs_2, state_h_enc_1, state_c_enc_1, state_h_enc_2, state_c_enc_2 = encoder_model.predict(input_seq)
+    states_value = [state_h_enc_1, state_c_enc_1, state_h_enc_2, state_c_enc_2, encoder_outputs_1, encoder_outputs_2]
 
     # Generate empty target sequence of length 1.
     target_seq = np.zeros((1, 1, num_decoder_tokens))
@@ -289,7 +278,7 @@ def decode_sequence(input_seq):
     stop_condition = False
     decoded_sentence = ""
     while not stop_condition:
-        output_tokens, h1, c1, h2, c2, h3, c3, h4, c4 = decoder_model.predict([target_seq] + states_value)
+        output_tokens, h1, c1, h2, c2 = decoder_model.predict([target_seq] + states_value)
 
         # Sample a token
         sampled_token_index = np.argmax(output_tokens[0, -1, :])
@@ -306,7 +295,7 @@ def decode_sequence(input_seq):
         target_seq[0, 0, sampled_token_index] = 1.0
 
         # Update states
-        states_value = [h1, c1, h2, c2, h3, c3, h4, c4]
+        states_value = [h1, c1, h2, c2, encoder_outputs_1, encoder_outputs_2]
     return decoded_sentence
 
 
@@ -317,7 +306,7 @@ random.seed(1234)
 for idx in range(5):
     # Take one sequence (part of the training set)
     # for trying out decoding.
-    seq_index =random.randrange(len(input_texts))
+    seq_index = random.randrange(len(input_texts))
     input_seq = encoder_input_data[seq_index : seq_index + 1]
     decoded_sentence = decode_sequence(input_seq)
     print("-")

@@ -169,7 +169,6 @@ attention_outputs = attention([decoder_outputs, encoder_outputs])
 concatenate = keras.layers.Concatenate(axis=-1, name="concatenate")
 decoder_concat_outputs = concatenate([decoder_outputs, attention_outputs])
 
-#decoder_dense = keras.layers.TimeDistributed(keras.layers.Dense(num_decoder_tokens, activation="softmax"))
 decoder_dense = keras.layers.Dense(num_decoder_tokens, activation="softmax", name="dense_layer")
 decoder_outputs = decoder_dense(decoder_concat_outputs)
 
@@ -195,7 +194,7 @@ if predict == False:
         validation_split=0.2,
     )
     # Save model
-    model.save("s2s_plain_with_attention")
+    model.save("s2s_plain_with_attention.keras")
 
 """
 ## Run inference (sampling)
@@ -209,10 +208,10 @@ Output will be the next target token.
 
 # Define sampling models
 # Restore the model and construct the encoder and decoder.
-model = keras.models.load_model("s2s_plain_with_attention")
+model = keras.models.load_model("s2s_plain_with_attention.keras")
 
 # Save the model graph to png file
-tf.keras.utils.plot_model(model, to_file='./plots/plain_with_attention.png', show_shapes=True, show_dtype=True)
+# tf.keras.utils.plot_model(model, to_file='./plots/plain_with_attention.png', show_shapes=True, show_dtype=True)
 
 r_encoder_inputs = model.input[0]  # input_1
 r_encoder_outputs, r_state_h_enc, r_state_c_enc = model.layers[2].output  # lstm_1
