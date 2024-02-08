@@ -197,7 +197,7 @@ if predict == False:
         validation_split=0.2,
     )
     # Save model
-    model.save("s2s_cells_with_attention.keras")
+    model.save("./models/s2s_cells_with_attention.keras")
 
 """
 ## Run inference (sampling)
@@ -211,7 +211,7 @@ Output will be the next target token.
 
 # Define sampling models
 # Restore the model and construct the encoder and decoder.
-model = keras.models.load_model("s2s_cells_with_attention.keras")
+model = keras.models.load_model("./models/s2s_cells_with_attention.keras")
 
 encoder_inputs = model.input[0]  # input_1
 encoder_outputs_1, state_h_enc_1, state_c_enc_1 = model.layers[2].output  # lstm_1
