@@ -6,6 +6,8 @@ Last modified: 2020/04/26
 Description: Character-level recurrent sequence-to-sequence model.
 """
 
+import argparse
+import json
 import random
 import sys
 
@@ -13,7 +15,7 @@ import numpy as np
 import tensorflow as tf
 from tensorflow import keras
 
-model_parameters = {
+default_model_parameters = {
     "data_path": "./data/fra.txt",  # Path to the training data file on disk
     "start_sequence_char": "\t",  # Use "tab" as the "start sequence" character
     "end_sequence_char": "\n",  # use "newline" as the "end sequence" character
@@ -270,6 +272,19 @@ def decode_sequences(encoder_model, decoder_model, model_parameters, training_da
 
 
 if __name__ == "__main__":
+    argParse = argparse.ArgumentParser(
+        "To accept configuration file containing parameters for seq2seq model"
+    )
+    argParse.add_argument("-c", "--config_file", type=str)
+    args = argParse.parse_args()
+
+    if args.config_file is not None:
+        with open(args.config_file, "r") as fp:
+            model_parameters = json.load(fp)
+            print(f"Loaded model_parameters: {model_parameters}")
+    else:
+        model_parameters = default_model_parameters
+
     training_data = prepare_training_data(model_parameters)
     model = build_model(
         model_parameters,
